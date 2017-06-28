@@ -1,16 +1,23 @@
 package slipperyslopemd
 
-import (
-	"bytes"
-	"io"
-)
+import "io"
 
 // ParseNoEscapeFromBytes parses a byte slice to Slippery-Slope Markdown without
 // escaping any existing HTML characters.
 func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
-	const lenBuffer = 3
-	buffer := []byte{0, 0, 0}
-	state := 0
+	const (
+		// Parsing states
+		StateNormal         = 0
+		StateAsterisk       = 1
+		StateDoubleAsterisk = 2
+
+		// Format states
+		FormatStateNormal = 0
+		FormatStateBold   = 1
+	)
+
+	parseState := 0
+	formatState := 0
 
 	i := 0
 
@@ -20,29 +27,32 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 		}
 
 	STATE:
-		switch state {
-		case 0: // Normal Mode
+		switch parseState {
+		case StateNormal: // Normal Mode
 			for ; i < len(input); i++ {
 				b := input[i]
-				buffer = append(buffer, b)[1:]
+				if b == '*' {
+					parseState = StateAsterisk
+					break STATE
+				}
 				w.Write([]byte{b})
-				if bytes.Compare(buffer[lenBuffer-2:], []byte("**")) == 0 {
+			}
+		case StateAsterisk:
+			b := input[i]
+			if b == '*' {
+				switch formatState {
+				case FormatStateNormal:
+					formatState = FormatStateBold
 					w.Write([]byte("<b>"))
-					state = 1
-					break STATE
-				}
-			}
-		case 1: // Bold Mode
-			for ; i < len(input); i++ {
-				b := input[i]
-				buffer = append(buffer, b)[1:]
-				w.Write([]byte{b})
-				if bytes.Compare(buffer[lenBuffer-2:], []byte("**")) == 0 {
+				case FormatStateBold:
+					formatState = FormatStateNormal
 					w.Write([]byte("</b>"))
-					state = 0
-					break STATE
 				}
+			} else {
+				w.Write([]byte{b})
 			}
+			parseState = StateNormal
+			break STATE
 		}
 		i++
 	}
