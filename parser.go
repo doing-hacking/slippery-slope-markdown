@@ -7,17 +7,22 @@ import "io"
 func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 	const (
 		// Parsing states
-		StateNormal         = 0
-		StateAsterisk       = 1
-		StateDoubleAsterisk = 2
+		StateNormal   = 0
+		StateAsterisk = 1
+		StateLineFeed = 3
 
 		// Format states
 		FormatStateNormal = 0
 		FormatStateBold   = 1
+
+		// List states
+		ListStateNotInList = 0
+		ListStateInList    = 1
 	)
 
 	parseState := 0
 	formatState := 0
+	listState := 0
 
 	i := 0
 
@@ -31,8 +36,12 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 		case StateNormal: // Normal Mode
 			for ; i < len(input); i++ {
 				b := input[i]
-				if b == '*' {
+				switch b {
+				case '*':
 					parseState = StateAsterisk
+					break STATE
+				case '\n':
+					parseState = StateLineFeed
 					break STATE
 				}
 				w.Write([]byte{b})
@@ -49,6 +58,24 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 					w.Write([]byte("</b>"))
 				}
 			} else {
+				w.Write([]byte{b})
+			}
+			parseState = StateNormal
+			break STATE
+		case StateLineFeed:
+			b := input[i]
+			if b == '-' {
+				switch listState {
+				case ListStateNotInList:
+					listState = ListStateInList
+					w.Write([]byte("<ul><li>"))
+				case ListStateInList:
+					w.Write([]byte("</li><li>"))
+				}
+			} else {
+				if listState == ListStateInList {
+					w.Write([]byte("</li></ul>"))
+				}
 				w.Write([]byte{b})
 			}
 			parseState = StateNormal
