@@ -16,6 +16,12 @@ limited text formatting (lists, bold font) could improve readability.
 - Tables?
   - Could be slippery
 
+## Usage
+Currently, the only available method is
+`ParseNoEscapeFromBytes(w io.Writer, input []byte)`,
+which takes a []byte input and writes the parsed output to an io.Writer
+(such as a `bytes.Buffer`)
+
 ## Inspiration
 The main inspiration for this package was that I wanted to see lists in Godoc.
 Somebody requested the same feature, but was told it would likely be rejected,
