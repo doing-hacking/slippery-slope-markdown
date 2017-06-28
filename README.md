@@ -27,4 +27,4 @@ The main inspiration for this package was that I wanted to see lists in Godoc.
 Somebody requested the same feature, but was told it would likely be rejected,
 it being a slippery slope to Markdown.
 That gave me a great idea for a new Go package - Slippery-Slope Markdown!
-This will also be bundled in the doing-hacks godoc fork.
+This will also be bundled in the doing-hacking godoc fork.
