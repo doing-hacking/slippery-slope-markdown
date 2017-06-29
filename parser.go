@@ -1,3 +1,13 @@
+// Package slipperyslopemd provides a slipper slope to Markdown without slipping
+//
+// Lists
+//
+// Unordered look like this
+// - Item 1
+// - Item 2
+// - Item 3
+// Not a list
+// - Consecutive list
 package slipperyslopemd
 
 import "io"
