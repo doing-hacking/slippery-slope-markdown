@@ -8,11 +8,10 @@ limited text formatting (lists, bold font) could improve readability.
 
 ### Current Features
 - Making text bold using `**bold**` syntax
-- Making unordered lists using `-` syntax
+- Making unordered lists using `- ` syntax
+- Making ordered lists using `1. ` syntax
 
 ### Possible Future Features
-- Ordered lists?
-  - Alternatively, `- 1.` as the canon way to make ordered lists
 - Tables?
   - Could be slippery
 
