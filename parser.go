@@ -5,6 +5,7 @@
 // Unordered look like this
 // - Item 1
 // - Item 2
+// which has another line below it
 // - Item 3
 //
 // Not a list
@@ -24,6 +25,7 @@ type BytesToWriterParser struct {
 	BoldState  bool
 	UListState bool
 	OListState bool
+	ListDepth  int
 }
 
 // Peek returns the byte at index i, or the byte 'X' if i is out of range.
@@ -105,7 +107,7 @@ func (parser *BytesToWriterParser) CheckLineType(i int) (
 // ParseNoEscapeFromBytes parses a byte slice to Slippery-Slope Markdown without
 // escaping any existing HTML characters.
 func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
-	parser := &BytesToWriterParser{w, input, 0, false, false, false}
+	parser := &BytesToWriterParser{w, input, 0, false, false, false, 0}
 
 	const (
 		// Parsing states
@@ -154,8 +156,12 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 				}
 			} else {
 				if parser.UListState {
-					w.Write([]byte("</li></ul>"))
-					parser.UListState = false
+					if b == '\n' {
+						w.Write([]byte("</li></ul>"))
+						parser.UListState = false
+					} else {
+						w.Write([]byte{' '})
+					}
 				}
 				w.Write([]byte{b})
 			}
