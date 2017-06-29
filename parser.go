@@ -2,27 +2,38 @@ package slipperyslopemd
 
 import "io"
 
+// BytesToWriterParser converts a byte slice containing Slippery-Slope Markdown
+// formatted text and converts it to HTML.
+type BytesToWriterParser struct {
+	Writer     io.Writer
+	Input      []byte
+	Index      int
+	BoldState  bool
+	UListState bool
+	OListState bool
+}
+
+// Peek returns the byte at index i, or the byte 'X' if i is out of range.
+func (parser *BytesToWriterParser) Peek(i int) byte {
+	if i >= len(parser.Input) {
+		return 'X'
+	}
+	return parser.Input[i]
+}
+
 // ParseNoEscapeFromBytes parses a byte slice to Slippery-Slope Markdown without
 // escaping any existing HTML characters.
 func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
+	parser := &BytesToWriterParser{w, input, 0, false, false, false}
+
 	const (
 		// Parsing states
 		StateNormal   = 0
 		StateAsterisk = 1
 		StateLineFeed = 3
-
-		// Format states
-		FormatStateNormal = 0
-		FormatStateBold   = 1
-
-		// List states
-		ListStateNotInList = 0
-		ListStateInList    = 1
 	)
 
 	parseState := 0
-	formatState := 0
-	listState := 0
 
 	i := 0
 
@@ -49,13 +60,12 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 		case StateAsterisk:
 			b := input[i]
 			if b == '*' {
-				switch formatState {
-				case FormatStateNormal:
-					formatState = FormatStateBold
-					w.Write([]byte("<b>"))
-				case FormatStateBold:
-					formatState = FormatStateNormal
+				if parser.BoldState {
 					w.Write([]byte("</b>"))
+					parser.BoldState = false
+				} else {
+					w.Write([]byte("<b>"))
+					parser.BoldState = true
 				}
 			} else {
 				w.Write([]byte{b})
@@ -65,16 +75,16 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 		case StateLineFeed:
 			b := input[i]
 			if b == '-' {
-				switch listState {
-				case ListStateNotInList:
-					listState = ListStateInList
-					w.Write([]byte("<ul><li>"))
-				case ListStateInList:
+				if parser.UListState {
 					w.Write([]byte("</li><li>"))
+				} else {
+					w.Write([]byte("<ul><li>"))
+					parser.UListState = true
 				}
 			} else {
-				if listState == ListStateInList {
+				if parser.UListState {
 					w.Write([]byte("</li></ul>"))
+					parser.UListState = false
 				}
 				w.Write([]byte{b})
 			}
