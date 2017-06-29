@@ -6,6 +6,7 @@
 // - Item 1
 // - Item 2
 // - Item 3
+//
 // Not a list
 // - Consecutive list
 //
@@ -42,6 +43,63 @@ func (parser *BytesToWriterParser) AddToggleBold() {
 		parser.Writer.Write([]byte("<b>"))
 		parser.BoldState = true
 	}
+}
+
+// CheckLineType reports if the line is an ordered list item, if the line is
+// an unordered list item, and the number of leading spaces on the line.
+// The parameter i is assumed to be the index of the line's first character.
+func (parser *BytesToWriterParser) CheckLineType(i int) (
+	bool, // This is an ordered list
+	bool, // This is an unordered list
+	int, // Depth of line start
+) {
+	// Get the number of leading spaces
+	leadingSpace := 0
+	for j := i; j < len(parser.Input); j++ {
+		if parser.Input[j] == ' ' {
+			leadingSpace++
+		} else {
+			break
+		}
+	}
+	// Get the index of the first character after the leading spaces
+	s := i + leadingSpace
+	// If the first character is out of range, return
+	if s >= len(parser.Input) {
+		return false, false, 0
+	}
+
+	// Lists start with "- "
+	if parser.Input[s] == '-' && parser.Peek(s+1) == ' ' {
+		return false, true, s + 2
+	}
+
+	// Ordered lists start with any number of consecutive digits plus ". "
+	leadingDigits := 0
+	for j := s; j < len(parser.Input); j++ {
+		if parser.Input[j] >= 0x30 && parser.Input[i] < 0x40 {
+			leadingDigits++
+		} else {
+			break
+		}
+	}
+
+	if leadingDigits == 0 {
+		return false, false, 0
+	}
+
+	// Add leading digits to start index
+	s = s + leadingDigits
+	// If the first character is out of range, return
+	if s >= len(parser.Input) {
+		return false, false, 0
+	}
+
+	if parser.Input[s] == '.' {
+		return true, false, s + 1
+	}
+
+	return false, false, 0
 }
 
 // ParseNoEscapeFromBytes parses a byte slice to Slippery-Slope Markdown without
@@ -85,7 +143,9 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 			}
 		case StateLineFeed:
 			b := input[i]
-			if b == '-' {
+			_, ul, _ := parser.CheckLineType(i)
+
+			if ul {
 				if parser.UListState {
 					w.Write([]byte("</li><li>"))
 				} else {
