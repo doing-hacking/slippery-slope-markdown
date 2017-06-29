@@ -66,12 +66,12 @@ func (parser *BytesToWriterParser) CheckLineType(i int) (
 	s := i + leadingSpace
 	// If the first character is out of range, return
 	if s >= len(parser.Input) {
-		return false, false, 0
+		return false, false, leadingSpace
 	}
 
 	// Lists start with "- "
 	if parser.Input[s] == '-' && parser.Peek(s+1) == ' ' {
-		return false, true, s + 2
+		return false, true, leadingSpace + 2
 	}
 
 	// Ordered lists start with any number of consecutive digits plus ". "
@@ -85,18 +85,18 @@ func (parser *BytesToWriterParser) CheckLineType(i int) (
 	}
 
 	if leadingDigits == 0 {
-		return false, false, 0
+		return false, false, leadingSpace
 	}
 
 	// Add leading digits to start index
 	s = s + leadingDigits
 	// If the first character is out of range, return
 	if s >= len(parser.Input) {
-		return false, false, 0
+		return false, false, leadingSpace
 	}
 
 	if parser.Input[s] == '.' {
-		return true, false, s + 1
+		return true, false, leadingSpace + leadingDigits + 2
 	}
 
 	return false, false, 0
