@@ -11,6 +11,11 @@
 // Not a list
 // - Consecutive list
 //
+// Ordered List
+// 1. This is item 1
+// 2. This is item 2
+// 4. Inconsistent numbering gets ignored
+//
 // Toggling bold text **on and** off and** on again and then **off again.
 package slipperyslopemd
 
@@ -47,14 +52,50 @@ func (parser *BytesToWriterParser) AddToggleBold() {
 	}
 }
 
+// AddUListItem creates an unordered list item, starting a new list if necessary.
+func (parser *BytesToWriterParser) AddUListItem() {
+	if parser.UListState {
+		parser.Writer.Write([]byte("</li><li>"))
+	} else {
+		parser.Writer.Write([]byte("<ul><li>"))
+		parser.UListState = true
+	}
+}
+
+// AddUListEnd closes an unordered list.
+func (parser *BytesToWriterParser) AddUListEnd() {
+	parser.Writer.Write([]byte("</li></ul>"))
+	parser.UListState = false
+}
+
+// AddOListItem creates an ordered list item, starting a new list if necessary.
+func (parser *BytesToWriterParser) AddOListItem() {
+	if parser.OListState {
+		parser.Writer.Write([]byte("</li><li>"))
+	} else {
+		parser.Writer.Write([]byte("<ol><li>"))
+		parser.OListState = true
+	}
+}
+
+// AddOListEnd closes an ordered list.
+func (parser *BytesToWriterParser) AddOListEnd() {
+	parser.Writer.Write([]byte("</li></ol>"))
+	parser.OListState = false
+}
+
 // CheckLineType reports if the line is an ordered list item, if the line is
 // an unordered list item, and the number of leading spaces on the line.
 // The parameter i is assumed to be the index of the line's first character.
 func (parser *BytesToWriterParser) CheckLineType(i int) (
+	bool, // This is a blank line
 	bool, // This is an ordered list
 	bool, // This is an unordered list
 	int, // Depth of line start
 ) {
+	// parser.Writer.Write(
+	// 	[]byte("`i=" + string([]byte{parser.Peek(i)}) + "`"),
+	// )
 	// Get the number of leading spaces
 	leadingSpace := 0
 	for j := i; j < len(parser.Input); j++ {
@@ -68,12 +109,17 @@ func (parser *BytesToWriterParser) CheckLineType(i int) (
 	s := i + leadingSpace
 	// If the first character is out of range, return
 	if s >= len(parser.Input) {
-		return false, false, leadingSpace
+		return false, false, false, leadingSpace
 	}
+	// If a blank line, return blank=true
+	if parser.Input[s] == '\n' || parser.Input[s] == '<' {
+		return true, false, false, 0
+	}
+	// parser.Writer.Write([]byte("`s=" + string([]byte{parser.Input[s]}) + "`"))
 
 	// Lists start with "- "
 	if parser.Input[s] == '-' && parser.Peek(s+1) == ' ' {
-		return false, true, leadingSpace + 2
+		return false, false, true, leadingSpace + 2
 	}
 
 	// Ordered lists start with any number of consecutive digits plus ". "
@@ -87,21 +133,21 @@ func (parser *BytesToWriterParser) CheckLineType(i int) (
 	}
 
 	if leadingDigits == 0 {
-		return false, false, leadingSpace
+		return false, false, false, leadingSpace
 	}
 
 	// Add leading digits to start index
 	s = s + leadingDigits
-	// If the first character is out of range, return
+	// If the first character is out of range, return false,
 	if s >= len(parser.Input) {
-		return false, false, leadingSpace
+		return false, false, false, leadingSpace
 	}
 
 	if parser.Input[s] == '.' {
-		return true, false, leadingSpace + leadingDigits + 2
+		return false, true, false, leadingSpace + leadingDigits + 2
 	}
 
-	return false, false, 0
+	return false, false, false, 0
 }
 
 // ParseNoEscapeFromBytes parses a byte slice to Slippery-Slope Markdown without
@@ -144,27 +190,39 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 				w.Write([]byte{b})
 			}
 		case StateLineFeed:
-			b := input[i]
-			_, ul, _ := parser.CheckLineType(i)
+			blank, ol, ul, offset := parser.CheckLineType(i)
 
-			if ul {
+			if blank {
 				if parser.UListState {
-					w.Write([]byte("</li><li>"))
-				} else {
-					w.Write([]byte("<ul><li>"))
-					parser.UListState = true
+					parser.AddUListEnd()
 				}
+				if parser.OListState {
+					parser.AddOListEnd()
+				}
+				w.Write([]byte{'\n'})
 			} else {
-				if parser.UListState {
-					if b == '\n' {
-						w.Write([]byte("</li></ul>"))
-						parser.UListState = false
-					} else {
+				if ul {
+					parser.AddUListItem()
+				} else {
+					if parser.UListState {
 						w.Write([]byte{' '})
 					}
 				}
-				w.Write([]byte{b})
+
+				if ol {
+					parser.AddOListItem()
+				} else {
+					if parser.OListState {
+						w.Write([]byte{' '})
+					}
+				}
 			}
+
+			if ul || ol {
+				i += offset
+			}
+			w.Write([]byte{input[i]})
+
 			parseState = StateNormal
 			break STATE
 		}
