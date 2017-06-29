@@ -8,6 +8,8 @@
 // - Item 3
 // Not a list
 // - Consecutive list
+//
+// Toggling bold text **on and** off and** on again and then **off again.
 package slipperyslopemd
 
 import "io"
@@ -29,6 +31,17 @@ func (parser *BytesToWriterParser) Peek(i int) byte {
 		return 'X'
 	}
 	return parser.Input[i]
+}
+
+// AddToggleBold adds an open or closing <b> tag based on the state.
+func (parser *BytesToWriterParser) AddToggleBold() {
+	if parser.BoldState {
+		parser.Writer.Write([]byte("</b>"))
+		parser.BoldState = false
+	} else {
+		parser.Writer.Write([]byte("<b>"))
+		parser.BoldState = true
+	}
 }
 
 // ParseNoEscapeFromBytes parses a byte slice to Slippery-Slope Markdown without
@@ -59,29 +72,17 @@ func ParseNoEscapeFromBytes(w io.Writer, input []byte) {
 				b := input[i]
 				switch b {
 				case '*':
-					parseState = StateAsterisk
-					break STATE
+					if parser.Peek(i+1) == '*' {
+						parser.AddToggleBold()
+						i++
+						break STATE
+					}
 				case '\n':
 					parseState = StateLineFeed
 					break STATE
 				}
 				w.Write([]byte{b})
 			}
-		case StateAsterisk:
-			b := input[i]
-			if b == '*' {
-				if parser.BoldState {
-					w.Write([]byte("</b>"))
-					parser.BoldState = false
-				} else {
-					w.Write([]byte("<b>"))
-					parser.BoldState = true
-				}
-			} else {
-				w.Write([]byte{b})
-			}
-			parseState = StateNormal
-			break STATE
 		case StateLineFeed:
 			b := input[i]
 			if b == '-' {
